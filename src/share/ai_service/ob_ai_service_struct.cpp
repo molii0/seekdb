@@ -224,7 +224,12 @@ EndpointType::TYPE EndpointType::str_to_endpoint_type(const ObString &type_str)
 int ObAiModelEndpointInfo::get_unencrypted_access_key(common::ObIAllocator &allocator, ObString &unencrypted_access_key) const
 {
   int ret = OB_SUCCESS;
-  if (OB_FAIL(decrypt_access_key_(allocator, access_key_, unencrypted_access_key))) {
+  // Providers such as Ollama need no API key, so an empty access_key is legal.
+  // Decrypting the empty string would fail with a null-value error and break the
+  // whole request before it is sent.
+  if (access_key_.empty()) {
+    unencrypted_access_key.reset();
+  } else if (OB_FAIL(decrypt_access_key_(allocator, access_key_, unencrypted_access_key))) {
   }
   return ret;
 }

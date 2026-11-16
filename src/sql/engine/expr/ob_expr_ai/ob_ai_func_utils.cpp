@@ -258,7 +258,13 @@ int ObOllamaUtils::get_header(common::ObIAllocator &allocator,
                               common::ObArray<ObString> &headers) 
 {
   int ret = OB_SUCCESS;
-  // ollama header is empty, do nothing
+  UNUSED(allocator);
+  // Ollama does not authenticate, but its API still takes a JSON body. An empty
+  // header list is rejected by ObAIFuncClient::init(), so the request must carry
+  // at least the content type.
+  if (OB_FAIL(headers.push_back(ObString::make_string("Content-Type: application/json")))) {
+    LOG_WARN("failed to add ollama content type header", K(ret));
+  }
   return ret;
 }
 
@@ -1306,6 +1312,8 @@ int ObAIFuncModel::call_completion(ObString &prompt, ObJsonObject *config, ObStr
   } else if (OB_FAIL(complete_provider->get_body(*allocator_, request_model_name, prompt_str, prompt, config, body))) {
   } else if (OB_FAIL(client.send_post(*allocator_, endpoint_info_.get_url(), headers, body, response))) {
   } else if (OB_FAIL(complete_provider->parse_output(*allocator_, response, result_base))) {
+  } else if (OB_ISNULL(result_base)) {
+    ret = OB_ERR_UNEXPECTED;
   } else if (OB_FAIL(ObAIFuncJsonUtils::print_json_to_str(*allocator_, result_base, result_str))) {
   } else {
     result = result_str;
