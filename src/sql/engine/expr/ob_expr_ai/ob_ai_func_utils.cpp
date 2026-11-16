@@ -1627,6 +1627,14 @@ int ObAIFuncPromptObjectUtils::replace_all_str_args_in_template(ObIAllocator &al
       if (OB_NOT_NULL(arg_node) && arg_node->json_type() == ObJsonNodeType::J_STRING) {
         ObJsonString *arg_str = static_cast<ObJsonString *>(arg_node);
         max_result_len += arg_str->get_str().length();
+      } else if (OB_NOT_NULL(arg_node)) {
+        // JSON arguments such as {"text":"..."} are rendered as their JSON text
+        // instead of being rejected, so AI_PROMPT output can feed AI_COMPLETE.
+        ObString arg_text;
+        if (OB_FAIL(ObAIFuncJsonUtils::print_json_to_str(allocator, arg_node, arg_text))) {
+        } else {
+          max_result_len += arg_text.length();
+        }
       } else {
         ret = OB_INVALID_ARGUMENT;
       }
@@ -1677,6 +1685,15 @@ int ObAIFuncPromptObjectUtils::replace_all_str_args_in_template(ObIAllocator &al
                 if (result_pos + arg_value.length() <= max_result_len) {
                   MEMCPY(result_buf + result_pos, arg_value.ptr(), arg_value.length());
                   result_pos += arg_value.length();
+                } else {
+                  ret = OB_BUF_NOT_ENOUGH;
+                }
+              } else if (OB_NOT_NULL(arg_node)) {
+                ObString arg_text;
+                if (OB_FAIL(ObAIFuncJsonUtils::print_json_to_str(allocator, arg_node, arg_text))) {
+                } else if (result_pos + arg_text.length() <= max_result_len) {
+                  MEMCPY(result_buf + result_pos, arg_text.ptr(), arg_text.length());
+                  result_pos += arg_text.length();
                 } else {
                   ret = OB_BUF_NOT_ENOUGH;
                 }
